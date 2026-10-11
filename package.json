@@ -1,0 +1,22 @@
+{
+  "name": "presentationcoreshift",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Moteur de présentations animées Coreshift : un fichier de contenu, trois sorties (web animé, PDF léger, vidéo).",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "pdf": "node scripts/pdf.mjs",
+    "video": "node scripts/video.mjs",
+    "all": "node scripts/build.mjs && node scripts/pdf.mjs && node scripts/video.mjs",
+    "dev": "node scripts/build.mjs --watch"
+  },
+  "dependencies": {
+    "@fontsource/geist-mono": "^5.3.0",
+    "@fontsource/geist-sans": "^5.3.0",
+    "js-yaml": "^5.4.3"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  }
+}

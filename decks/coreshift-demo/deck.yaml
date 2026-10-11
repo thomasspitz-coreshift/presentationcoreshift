@@ -1,0 +1,182 @@
+# Présentation de démonstration — contenu repris de coreshift.fr.
+# Seul ce fichier change d'une présentation à l'autre : le moteur s'occupe du design et des animations.
+#
+# Syntaxe :
+#   *mot*        → mis en avant en orange
+#   bg:          → pose du fond animé : hero | left | right | low | calm | grid | off
+#   theme:       → dark (défaut) | light | accent
+#   section:     → libellé affiché en haut à droite
+#   duration:    → durée en secondes en lecture automatique / vidéo (sinon calculée)
+
+title: Coreshift — L'intelligence artificielle des TPE et PME
+description: Présentation animée Coreshift (démo du moteur de slides).
+brand: Coreshift
+
+slides:
+  - layout: hero
+    section: Introduction
+    bg: hero
+    eyebrow: Coreshift · Intégrateur Mistral AI
+    title: L'intelligence artificielle des *TPE et PME*.
+    lead: Une plateforme de gestion avec Verso, l'assistante propulsée par Mistral AI, un cabinet de conseil et des jumeaux numériques.
+    actions: [Demander une démo, Voir la plateforme]
+    note: Essai de 14 jours sans carte · Base de données à Paris
+    feed:
+      title: Verso · activité
+      tag: Exemple
+      items:
+        - ["07:58", "Nouveau client noté sur le terrain avec « Capturer »", Fait]
+        - ["08:10", "Signal de prospection : reprise d'entreprise dans votre zone", Alerte]
+        - ["09:15", "Devis 0427 sans réponse : relance rédigée", À valider]
+        - ["09:22", "Fichier Excel de contacts importé", Fait]
+        - ["11:40", "Planning du chantier Garonne mis à jour", Fait]
+        - ["14:30", "Facture d'acompte impayée : relance préparée", À valider]
+        - ["18:00", "Trésorerie prévue à 30, 60 et 90 jours mise à jour", Prêt]
+
+  - layout: chat
+    section: Verso
+    bg: right
+    eyebrow: 01 · Vous parlez, Verso agit
+    title: Une IA qui connaît votre métier et prend en charge *ce qui se répète*.
+    text: "Devis, factures, relances, documents : Verso prépare, vous validez."
+    chat:
+      tabs: [Verso, Clients, Agents, Sécurité]
+      space: Menuiserie Dubreuil (exemple)
+      prompt: Relance les devis sans réponse depuis plus de 10 jours.
+      reply: 3 devis concernés. J'ai rédigé une relance pour chacun.
+      items:
+        - [Devis 2026-0427, J+12]
+        - [Devis 2026-0431, J+15]
+        - [Devis 2026-0438, J+21]
+      action: Envoyer les 3 relances
+
+  - layout: grid
+    section: Métiers
+    theme: light
+    bg: grid
+    eyebrow: 02 · Secteurs
+    title: L'IA au service des métiers qui font tourner *la France*.
+    items:
+      - [BTP & artisanat, "Chantiers, devis, acomptes"]
+      - [Transport & logistique, "Cotations, CMR, échéances"]
+      - [Cabinets comptables, "Relances de pièces, saisie"]
+      - [Offices notariaux, "Synthèse de dossiers, actes"]
+      - [Conseil & cabinets, "Missions, livrables, staffing"]
+      - [Services aux entreprises, Facturation récurrente]
+      - [Commerce, "Clients, commandes, suivi"]
+      - [Industrie, "Documents, savoir-faire"]
+
+  - layout: cards
+    section: Offres
+    bg: left
+    eyebrow: 03 · Trois offres, une équipe
+    title: Commencez par un problème. *Allez plus loin à votre rythme.*
+    text: Plateforme, Conseil, TwinsAI. Un même interlocuteur de bout en bout.
+    cards:
+      - tag: 01 · Démarrage rapide
+        title: Une tâche qui vous prend trop de temps
+        text: "Relances, devis, facturation : on commence par ce qui coûte le plus d'heures."
+        cta: Plateforme
+        viz:
+          type: progress
+          label: Ouverture du compte
+          value: 30 min
+          steps: [Contacts importés depuis Excel, Première relance envoyée]
+      - tag: 02 · Cadrage & stratégie
+        title: Une stratégie IA pour toute l'entreprise
+        text: Audit offert, conformité AI Act, formation des dirigeants, feuille de route.
+        cta: Conseil
+        viz:
+          type: checklist
+          items: [Audit offert, Conformité AI Act, Formation des dirigeants, Feuille de route]
+      - tag: 03 · Transmission
+        title: Le savoir d'une personne clé, *démultiplié*
+        text: TwinsAI capte le savoir-faire d'un dirigeant ou d'un expert et le rend disponible, même en son absence.
+        cta: TwinsAI
+        viz:
+          type: twin
+          left: L'expert
+          right: Son jumeau
+
+  - layout: punchline
+    section: Conviction
+    quote: Vous gardez la main sur les décisions. La machine prend en charge *ce qui se répète.*
+    caption: La conviction Coreshift
+
+  - layout: chart
+    section: Plateforme
+    bg: low
+    eyebrow: 04 · Trésorerie
+    title: Les semaines à risque, *avant qu'elles n'arrivent*.
+    text: Encaissements projetés, charges récurrentes, prévision à 90 jours. Vous voyez venir, vous décidez à temps.
+    modules: [CRM & pipeline, Facturation, Trésorerie, Agents]
+    active: Trésorerie
+    chart:
+      label: Trésorerie prévue · 13 semaines
+      tag: Exemple
+      unit: k€
+      values: [42, 45, 39, 36, 31, 24, 16, 21, 28, 33, 38, 44, 48]
+      threshold: 20
+      thresholdLabel: Seuil de sécurité
+      callout: "S7 · Acompte Garonne à relancer"
+
+  - layout: kpis
+    section: Tarif
+    bg: calm
+    eyebrow: 05 · Tarif
+    title: Un prix simple. *L'IA comprise.*
+    text: Tout Coreshift, avec Verso. Au-delà d'un usage courant, la consommation est facturée au coût réel.
+    items:
+      - label: Par utilisateur / mois
+        value: 9
+        unit: €
+        text: IA incluse pour un usage courant.
+        viz: { type: bar, value: 1, label: Verso + tous les modules }
+      - label: Essai gratuit
+        value: 14
+        unit: jours
+        text: Sans carte bancaire, sur code d'accès.
+        viz: { type: days, count: 14 }
+      - label: Mise en route
+        value: 30
+        unit: min
+        text: Pour ouvrir votre compte et importer vos contacts.
+        viz: { type: ring, value: 0.5, label: "30 / 60 min" }
+      - label: Prévision
+        value: 90
+        unit: jours
+        text: De trésorerie, mise à jour par Verso.
+        viz: { type: spark, values: [42, 45, 39, 36, 31, 24, 16, 21, 28, 33, 38, 44, 48], label: Exemple }
+
+  - layout: hub
+    section: Souveraineté
+    bg: low
+    eyebrow: 06 · Le socle
+    title: Conçu et opéré *en France*.
+    text: Seules les données nécessaires à une demande sont transmises aux modèles de Mistral AI.
+    facts:
+      - [Hébergement, France]
+      - [Isolation, Par entreprise]
+      - [Données transmises, Le strict nécessaire]
+      - [Horizon 2027, "Coreshift 1.0, modèle souverain"]
+    nodes:
+      - [Base de données, Paris]
+      - [Modèles, Mistral AI]
+      - [Vos données, Isolées par entreprise]
+      - [Déploiement, Cloud privé ou sur site]
+
+  - layout: cta
+    section: Contact
+    bg: hero
+    eyebrow: Toulouse · France
+    title: Parlons de votre entreprise, *à votre rythme*.
+    text: Nous revenons vers vous pour échanger sur votre activité.
+    card:
+      label: Ce que vous obtenez
+      title: Un premier rendez-vous *concret*.
+      items:
+        - Une démonstration de 30 minutes
+        - Un audit offert de 1 h 30
+        - Une estimation du temps que vous pouvez récupérer
+      action: contact@coreshift.fr
+    status: [Base de données à Paris, Intégrateur Mistral AI, coreshift.fr]
