@@ -13,7 +13,7 @@ export function deckName(argv = process.argv.slice(2)) {
   return argv.find((a) => !a.startsWith('--')) || 'coreshift-demo';
 }
 
-function fontFaces() {
+export function fontFaces() {
   const files = [
     ['Geist', 400, '@fontsource/geist-sans/files/geist-sans-latin-400-normal.woff2'],
     ['Geist', 500, '@fontsource/geist-sans/files/geist-sans-latin-500-normal.woff2'],
@@ -31,8 +31,9 @@ function fontFaces() {
 }
 
 export async function build(name) {
-  const deckFile = path.join(ROOT, 'decks', name, 'deck.yaml');
-  if (!fs.existsSync(deckFile)) throw new Error(`Introuvable : ${path.relative(ROOT, deckFile)}`);
+  // deck.yaml (écrit à la main) ou deck.json (exporté depuis le studio).
+  const deckFile = ['deck.yaml', 'deck.json'].map((f) => path.join(ROOT, 'decks', name, f)).find((f) => fs.existsSync(f));
+  if (!deckFile) throw new Error(`Introuvable : decks/${name}/deck.yaml ou deck.json`);
   const deck = loadYaml(fs.readFileSync(deckFile, 'utf8'));
 
   // Import frais à chaque build pour que --watch prenne en compte les gabarits modifiés.

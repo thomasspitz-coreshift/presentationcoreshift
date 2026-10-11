@@ -12,6 +12,25 @@ Un moteur pour produire des présentations animées aux couleurs de Coreshift, d
 
 Le design, les animations et la charte vivent dans `engine/`. Une nouvelle présentation, c'est uniquement un fichier `decks/<nom>/deck.yaml`.
 
+## Le studio (usage quotidien)
+
+`npm run studio` construit **Coreshift Slides**, le remplaçant du PowerPoint :
+
+- **Bibliothèque** de decks partagée avec l'équipe (publiée comme artefact claude.ai, les decks vivent dans sa base).
+- **Édition directe** : on clique sur un texte de la slide et on tape. Sélectionner des mots → « Mettre en orange ». Le panneau « Contenu détaillé » (YAML) règle les listes, chiffres et courbes, l'aperçu suit en direct.
+- **Gabarits** : « + Slide » ajoute l'un des 9 gabarits ; gabarit, fond clair ou sombre, animation du fond se changent dans les réglages. Annulation illimitée.
+- **Présenter** : plein écran animé, flèches, clic ou swipe, `Échap` pour sortir.
+- **Exporter** : PDF (sombre ou clair, une page par slide), présentation hors ligne `.html` (Fichier > Imprimer depuis Chrome donne un PDF vectoriel), contenu `.json`.
+- **Claude** : génération d'un premier jet à partir d'un brief, réécriture d'une slide sur consigne.
+
+| Fichier | Rôle |
+| --- | --- |
+| `dist/studio/studio.html` | page publiée comme artefact (bibliothèques chargées depuis les CDN autorisés) |
+| `dist/studio/index.html` | studio autonome, hors ligne : les decks restent dans le navigateur |
+| `studio/` | interface (`studio.css`) et logique (`studio.js`) du studio |
+
+Un deck exporté en `.json` depuis le studio se place dans `decks/<nom>/deck.json` : `npm run pdf -- <nom>` et `npm run video -- <nom>` fonctionnent alors comme avec un `deck.yaml`.
+
 ## Démarrer
 
 ```bash

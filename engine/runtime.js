@@ -1,32 +1,12 @@
-/* Moteur de lecture des présentations Coreshift.
-   Trois modes, choisis par l'URL :
+/* Lecteur des présentations Coreshift.
+   Expose window.CoreshiftPlayer (utilisé par le studio) et, si la page contient #deck-data,
+   démarre tout seul comme présentation autonome. Modes de la page autonome, choisis par l'URL :
      (défaut)   lecture web animée, navigation clavier / clic / swipe
      ?print     toutes les slides dans leur état final, une par page (export PDF)
      ?capture   horloge virtuelle pilotée par le script vidéo (export MP4 image par image)
-   Options : ?autoplay (enchaîne seul), ?light (force le thème clair), #3 (ouvre la slide 3). */
-(() => {
-  const qs = new URLSearchParams(location.search);
-  const MODE = qs.has('print') ? 'print' : qs.has('capture') ? 'capture' : 'live';
-  const AUTOPLAY = (qs.has('autoplay') || MODE === 'capture') && !qs.has('noauto');
-  const LOOP = qs.has('loop');
-  const FORCE_LIGHT = qs.has('light');
-  const REDUCED = MODE === 'live' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const DATA = JSON.parse(document.getElementById('deck-data').textContent);
-  const root = document.documentElement;
-  root.classList.add('mode-' + MODE);
-
-  const stage = document.getElementById('stage');
-  const slides = [...document.querySelectorAll('.slide')];
-  const metas = DATA.slides;
-  if (FORCE_LIGHT) {
-    slides.forEach((el, i) => {
-      if (metas[i].theme === 'dark') { metas[i].theme = 'light'; el.classList.replace('theme-dark', 'theme-light'); }
-    });
-  }
-
-  // ——— Horloge ———
-  let vt = 0;
-  const now = () => (MODE === 'capture' ? vt : performance.now());
+   Options : ?autoplay (enchaîne seul), ?loop, ?light (force le thème clair), ?noauto, #3 (ouvre la slide 3). */
+(function (global) {
+  'use strict';
 
   // ——— Courbes d'accélération ———
   const EASE = {
@@ -38,37 +18,13 @@
   };
   const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
   const lerp = (a, b, t) => a + (b - a) * t;
+  const pad = (n) => String(n).padStart(2, '0');
 
-  // ——— Interpolations ———
-  let tweens = [];
-  function tween({ dur = 900, delay = 0, ease = EASE.expo, update, done, group }) {
-    if (REDUCED) { dur = 1; delay = 0; }
-    const tw = { start: now() + delay, dur, ease, update, done, group };
-    update(0);
-    tweens.push(tw);
-    return tw;
-  }
-  function cancel(group) { tweens = tweens.filter((t) => t.group !== group); }
-  function runTweens(t) {
-    const list = tweens;
-    tweens = [];
-    for (const tw of list) {
-      if (t < tw.start) { tweens.push(tw); continue; }
-      const p = clamp((t - tw.start) / tw.dur);
-      tw.update(tw.ease(p));
-      if (p >= 1) tw.done && tw.done();
-      else tweens.push(tw);
-    }
-  }
-
-  // Boucles continues (impulsions du hub…), actives tant que leur slide est affichée.
-  let loops = [];
-
-  // ——— Animations d'entrée (attribut data-a) ———
   const fmtCache = {};
   const fmt = (v, dec) =>
     (fmtCache[dec] ||= new Intl.NumberFormat('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec })).format(v);
 
+  // ——— Animations d'entrée (attribut data-a) ———
   const ANIM = {
     fade: { dur: 900, ease: 'out', f: (el, p) => { el.style.opacity = p; } },
     up: { dur: 1100, f: (el, p) => { el.style.opacity = clamp(p * 1.4); el.style.transform = `translate3d(0,${(1 - p) * 38}px,0)`; } },
@@ -133,55 +89,6 @@
     return (el._words = out);
   }
 
-  // Prépare et lance toutes les animations d'une slide. Renvoie la fin de la dernière (ms).
-  function enter(i, offset) {
-    const slide = slides[i];
-    let end = 0;
-    for (const el of slide.querySelectorAll('[data-a]')) {
-      const kind = el.dataset.a;
-      const d = +(el.dataset.d || 0) + offset;
-      if (kind === 'words') {
-        splitWords(el).forEach((w, k) => {
-          tween({
-            group: i, delay: d + k * 55, dur: 1150, ease: EASE.expo,
-            update: (p) => {
-              w.style.opacity = clamp(p * 1.3);
-              w.style.transform = `translate3d(0,${(1 - p) * 0.42}em,0)`;
-              w.style.filter = p < 1 ? `blur(${(1 - p) * 12}px)` : '';
-            },
-          });
-          end = Math.max(end, d + k * 55 + 1150);
-        });
-        continue;
-      }
-      if (kind === 'pulse') {
-        const path = document.getElementById(el.dataset.path);
-        const len = path.getTotalLength();
-        const start = now() + d;
-        el.style.opacity = 0;
-        loops.push({
-          group: i,
-          f: (t) => {
-            if (t < start) return;
-            const u = (((t - start) / 2200) % 1);
-            const pt = path.getPointAtLength(len * u);
-            el.setAttribute('cx', pt.x);
-            el.setAttribute('cy', pt.y);
-            el.style.opacity = Math.sin(Math.PI * u).toFixed(3);
-          },
-        });
-        continue;
-      }
-      const a = ANIM[kind];
-      if (!a) continue;
-      a.init && a.init(el);
-      const dur = +(el.dataset.dur || a.dur);
-      tween({ group: i, delay: d, dur, ease: EASE[el.dataset.e || a.ease || 'expo'], update: (p) => a.f(el, p) });
-      end = Math.max(end, d + dur);
-    }
-    return end;
-  }
-
   // ——— Fond : rubans de lumière + grille ———
   const POSES = {
     hero:  { fx: .62, fy: .70, angle: -.55, spread: 1.0, twist: 1.0, bend: .35, amp: 1.0, intensity: 1.0, glow: 1.0, grid: 0 },
@@ -192,10 +99,9 @@
     grid:  { fx: .86, fy: .12, angle: -.9, spread: .65, twist: 1.0, bend: .2, amp: .5, intensity: .5, glow: .35, grid: 1 },
     off:   { fx: .5, fy: .5, angle: 0, spread: .7, twist: 1, bend: 0, amp: .5, intensity: 0, glow: 0, grid: 0 },
   };
-  function poseFor(i) {
-    const m = metas[i];
-    const b = typeof m.bg === 'string' ? { preset: m.bg } : m.bg || {};
-    const p = { ...(POSES[b.preset] || POSES.hero), ...b, light: m.theme === 'light' ? 1 : 0 };
+  function poseFor(meta) {
+    const b = typeof meta.bg === 'string' ? { preset: meta.bg } : meta.bg || {};
+    const p = { ...(POSES[b.preset] || POSES.hero), ...b, light: meta.theme === 'light' ? 1 : 0 };
     delete p.preset;
     if (p.light) p.intensity *= 0.6;
     return p;
@@ -349,169 +255,315 @@
     ctx.globalCompositeOperation = 'source-over';
   }
 
-  // ——— Mode PDF : chaque slide reçoit son fond figé en image légère ———
-  if (MODE === 'print') {
-    const W = 1600, H = 900;
-    const c = document.createElement('canvas');
-    c.width = W; c.height = H;
-    const ctx = c.getContext('2d');
-    const imgs = slides.map((slide, i) => {
-      if (metas[i].theme === 'accent') return Promise.resolve();
-      drawBackground(ctx, W, H, poseFor(i), 6 + i * 2.7);
-      const img = new Image();
-      img.className = 'print-bg';
-      img.alt = '';
-      img.src = c.toDataURL('image/jpeg', 0.82);
-      slide.prepend(img);
-      return img.decode().catch(() => {});
-    });
-    Promise.all([document.fonts.ready, ...imgs]).then(() => { window.__deckReady = true; });
-    return;
+  // Fond figé d'une slide (miniatures, éditeur, PDF). Le temps varie avec l'index pour varier les poses.
+  function paintBackground(canvas, meta, index) {
+    const ctx = canvas.getContext('2d');
+    drawBackground(ctx, canvas.width, canvas.height, poseFor(meta), 6 + index * 2.7);
+  }
+  let scratch;
+  function backgroundURL(meta, index, { width = 1600, height = 900, quality = 0.82 } = {}) {
+    scratch ||= document.createElement('canvas');
+    scratch.width = width; scratch.height = height;
+    paintBackground(scratch, meta, index);
+    return scratch.toDataURL('image/jpeg', quality);
   }
 
-  // ——— Lecture (web et capture vidéo) ———
-  const canvas = document.getElementById('bg');
-  const bctx = canvas.getContext('2d');
-  let cw = 0, ch = 0, dpr = 1;
-  let pose = poseFor(0);
+  // ——— Lecteur ———
+  // o : { viewport, stage, canvas, slides, metas, mode: 'live'|'capture', autoplay, loop, start,
+  //       controls (clavier/clic/swipe), input (élément qui reçoit clics et swipes), hash, onChange(i), onExit() }
+  function createPlayer(o) {
+    const mode = o.mode || 'live';
+    const reduced = mode === 'live' && global.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const { stage, canvas, slides, metas } = o;
+    const viewport = o.viewport || stage.parentElement;
+    stage.classList.add('deck-live');
 
-  const chrome = document.querySelector('.chrome-live');
-  const chromeSection = chrome.querySelector('.chrome-section');
-  const chromeNum = chrome.querySelector('.chrome-num');
-  const progress = stage.querySelector('.progress i');
-  const pad = (n) => String(n).padStart(2, '0');
+    let vt = 0;
+    const now = () => (mode === 'capture' ? vt : performance.now());
 
-  function layout() {
-    dpr = MODE === 'capture' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
-    const vp = document.getElementById('viewport');
-    cw = vp.clientWidth; ch = vp.clientHeight;
-    canvas.width = Math.round(cw * dpr);
-    canvas.height = Math.round(ch * dpr);
-    const s = Math.min(cw / 1920, ch / 1080);
-    stage.style.transform = `translate(-50%,-50%) scale(${s})`;
-  }
-  window.addEventListener('resize', layout);
-  layout();
+    let tweens = [];
+    let loops = [];
+    function tween({ dur = 900, delay = 0, ease = EASE.expo, update, done, group }) {
+      if (reduced) { dur = 1; delay = 0; }
+      const tw = { start: now() + delay, dur, ease, update, done, group };
+      update(0);
+      tweens.push(tw);
+      return tw;
+    }
+    const cancel = (group) => { tweens = tweens.filter((t) => t.group !== group); };
+    function runTweens(t) {
+      const list = tweens;
+      tweens = [];
+      for (const tw of list) {
+        if (t < tw.start) { tweens.push(tw); continue; }
+        const p = clamp((t - tw.start) / tw.dur);
+        tw.update(tw.ease(p));
+        if (p >= 1) tw.done && tw.done();
+        else tweens.push(tw);
+      }
+    }
 
-  let cur = -1;
-  let nextAt = Infinity;
-  let finished = false;
+    // Prépare et lance toutes les animations d'une slide. Renvoie la fin de la dernière (ms).
+    function enter(i, offset) {
+      const slide = slides[i];
+      let end = 0;
+      for (const el of slide.querySelectorAll('[data-a]')) {
+        const kind = el.dataset.a;
+        const d = +(el.dataset.d || 0) + offset;
+        if (kind === 'words') {
+          splitWords(el).forEach((w, k) => {
+            tween({
+              group: i, delay: d + k * 55, dur: 1150, ease: EASE.expo,
+              update: (p) => {
+                w.style.opacity = clamp(p * 1.3);
+                w.style.transform = `translate3d(0,${(1 - p) * 0.42}em,0)`;
+                w.style.filter = p < 1 ? `blur(${(1 - p) * 12}px)` : '';
+              },
+            });
+            end = Math.max(end, d + k * 55 + 1150);
+          });
+          continue;
+        }
+        if (kind === 'pulse') {
+          const path = slide.querySelector(`[id="${el.dataset.path}"]`);
+          if (!path) continue;
+          const len = path.getTotalLength();
+          const start = now() + d;
+          el.style.opacity = 0;
+          loops.push({
+            group: i,
+            f: (t) => {
+              if (t < start) return;
+              const u = ((t - start) / 2200) % 1;
+              const pt = path.getPointAtLength(len * u);
+              el.setAttribute('cx', pt.x);
+              el.setAttribute('cy', pt.y);
+              el.style.opacity = Math.sin(Math.PI * u).toFixed(3);
+            },
+          });
+          continue;
+        }
+        const a = ANIM[kind];
+        if (!a) continue;
+        a.init && a.init(el);
+        const dur = +(el.dataset.dur || a.dur);
+        tween({ group: i, delay: d, dur, ease: EASE[el.dataset.e || a.ease || 'expo'], update: (p) => a.f(el, p) });
+        end = Math.max(end, d + dur);
+      }
+      return end;
+    }
 
-  function setChromeTheme(theme) {
-    chrome.classList.remove('theme-dark', 'theme-light', 'theme-accent');
-    chrome.classList.add('theme-' + theme);
-    stage.style.setProperty('--prog-track', theme === 'dark' ? 'rgba(255,255,255,.12)' : 'rgba(20,17,14,.14)');
-  }
+    // Fond
+    const bctx = canvas.getContext('2d');
+    let cw = 0, ch = 0, dpr = 1;
+    let pose = poseFor(metas[0] || {});
+    function layout() {
+      dpr = mode === 'capture' ? 1 : Math.min(global.devicePixelRatio || 1, 1.5);
+      cw = viewport.clientWidth; ch = viewport.clientHeight;
+      canvas.width = Math.round(cw * dpr);
+      canvas.height = Math.round(ch * dpr);
+      const s = Math.min(cw / 1920, ch / 1080);
+      stage.style.transform = `translate(-50%,-50%) scale(${s})`;
+    }
+    const ro = global.ResizeObserver ? new ResizeObserver(layout) : null;
+    ro ? ro.observe(viewport) : global.addEventListener('resize', layout);
+    layout();
 
-  function goTo(i) {
-    i = clamp(i, 0, slides.length - 1);
-    if (i === cur) return;
-    const prev = cur;
-    cur = i;
-    const t0 = now();
+    // Chrome (logo, section, numéro) et barre de progression, s'ils existent dans la scène.
+    const chrome = stage.querySelector('.chrome-live');
+    const chromeSection = chrome && chrome.querySelector('.chrome-section');
+    const chromeNum = chrome && chrome.querySelector('.chrome-num');
+    const progress = stage.querySelector('.progress i');
+    let progressValue = 0;
+    function setChromeTheme(theme) {
+      if (!chrome) return;
+      chrome.classList.remove('theme-dark', 'theme-light', 'theme-accent');
+      chrome.classList.add('theme-' + theme);
+      stage.style.setProperty('--prog-track', theme === 'dark' ? 'rgba(255,255,255,.12)' : 'rgba(20,17,14,.14)');
+    }
 
-    if (prev >= 0) {
-      const out = slides[prev];
-      cancel(prev);
-      loops = loops.filter((l) => l.group !== prev);
-      tween({
-        group: prev, dur: 480, ease: EASE.io,
-        update: (p) => { out.style.opacity = 1 - p; out.style.transform = `translate3d(0,${-26 * p}px,0)`; },
-        done: () => { out.classList.remove('is-active'); out.style.opacity = ''; out.style.transform = ''; },
+    let cur = -1;
+    let nextAt = Infinity;
+    let finished = false;
+
+    function goTo(i) {
+      i = clamp(i, 0, slides.length - 1);
+      if (i === cur) return;
+      const prev = cur;
+      cur = i;
+      const t0 = now();
+
+      if (prev >= 0) {
+        const out = slides[prev];
+        cancel(prev);
+        loops = loops.filter((l) => l.group !== prev);
+        tween({
+          group: prev, dur: 480, ease: EASE.io,
+          update: (p) => { out.style.opacity = 1 - p; out.style.transform = `translate3d(0,${-26 * p}px,0)`; },
+          done: () => { out.classList.remove('is-active'); out.style.opacity = ''; out.style.transform = ''; },
+        });
+      }
+
+      const el = slides[i];
+      cancel(i);
+      loops = loops.filter((l) => l.group !== i);
+      el.style.opacity = ''; el.style.transform = '';
+      const end = enter(i, prev >= 0 ? 320 : 150);
+      el.classList.add('is-active');
+
+      // Fond : glissement fluide vers la pose de la nouvelle slide.
+      const from = { ...pose }, to = poseFor(metas[i]);
+      cancel('bg');
+      tween({ group: 'bg', dur: 1700, ease: EASE.io, update: (p) => { for (const k in to) pose[k] = lerp(from[k] ?? to[k], to[k], p); } });
+
+      const theme = metas[i].theme;
+      cancel('chrome');
+      if (chrome) {
+        chromeSection.textContent = metas[i].section || '';
+        chromeNum.textContent = `${pad(i + 1)} / ${pad(slides.length)}`;
+        tween({ group: 'chrome', delay: theme === 'accent' ? 700 : 250, dur: 10, update: (p) => { if (p >= 1) setChromeTheme(theme); } });
+        tween({ group: 'chrome', delay: 250, dur: 700, update: (p) => { chromeNum.style.opacity = p; chromeSection.style.opacity = p; } });
+      }
+      if (progress) {
+        const p0 = progressValue, p1 = (i + 1) / slides.length;
+        progressValue = p1;
+        tween({ group: 'chrome', dur: 900, ease: EASE.io, update: (p) => { progress.style.transform = `scaleX(${lerp(p0, p1, p)})`; } });
+      }
+
+      nextAt = t0 + (metas[i].duration ? metas[i].duration * 1000 : end + 2600);
+      if (o.hash) try { history.replaceState(null, '', `${location.search}#${i + 1}`); } catch {}
+      o.onChange && o.onChange(i);
+    }
+
+    function frame() {
+      const t = now();
+      runTweens(t);
+      for (const l of loops) l.f(t);
+      bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawBackground(bctx, cw, ch, pose, reduced ? 8 : t / 1000);
+      if (o.autoplay && t >= nextAt) {
+        if (cur < slides.length - 1) goTo(cur + 1);
+        else if (o.loop) goTo(0);
+        else { finished = true; nextAt = Infinity; }
+      }
+    }
+
+    // Navigation
+    const next = () => goTo(cur + 1);
+    const prev = () => goTo(cur - 1);
+    const offs = [];
+    const on = (target, type, fn, opts) => { target.addEventListener(type, fn, opts); offs.push(() => target.removeEventListener(type, fn, opts)); };
+    if (o.controls && mode === 'live') {
+      const input = o.input || global;
+      on(global, 'keydown', (e) => {
+        if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); next(); }
+        else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); prev(); }
+        else if (e.key === 'Home') goTo(0);
+        else if (e.key === 'End') goTo(slides.length - 1);
+        else if (e.key === 'Escape' && o.onExit) o.onExit();
+        else if (e.key === 'f' || e.key === 'F') {
+          const target = o.fullscreenTarget || document.documentElement;
+          const req = document.fullscreenElement ? document.exitFullscreen() : target.requestFullscreen?.();
+          req?.catch?.(() => {});
+        }
+      });
+      let tx = null, ty = null;
+      on(input, 'touchstart', (e) => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+      on(input, 'touchend', (e) => {
+        if (tx === null) return;
+        const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+        tx = null;
+        if (e.target.closest && e.target.closest('[data-player-ui]')) return;
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) (dx < 0 ? next : prev)();
+        else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) (e.changedTouches[0].clientX > global.innerWidth * 0.3 ? next : prev)();
+      });
+      on(input, 'click', (e) => {
+        if (e.pointerType === 'touch' || e.target.closest('a, button, [data-player-ui]')) return;
+        (e.clientX > global.innerWidth * 0.3 ? next : prev)();
       });
     }
 
-    const el = slides[i];
-    cancel(i);
-    loops = loops.filter((l) => l.group !== i);
-    el.style.opacity = ''; el.style.transform = '';
-    const offset = prev >= 0 ? 320 : 150;
-    const end = enter(i, offset);
-    el.classList.add('is-active');
-
-    // Fond : glissement fluide vers la pose de la nouvelle slide.
-    const from = { ...pose }, to = poseFor(i);
-    cancel('bg');
-    tween({ group: 'bg', dur: 1700, ease: EASE.io, update: (p) => { for (const k in to) pose[k] = lerp(from[k], to[k], p); } });
-
-    // Chrome : section, numéro, couleur.
-    const theme = metas[i].theme;
-    chromeSection.textContent = metas[i].section;
-    chromeNum.textContent = `${pad(i + 1)} / ${pad(slides.length)}`;
-    cancel('chrome');
-    tween({ group: 'chrome', delay: theme === 'accent' ? 700 : 250, dur: 10, update: (p) => { if (p >= 1) setChromeTheme(theme); } });
-    tween({ group: 'chrome', delay: 250, dur: 700, update: (p) => { chromeNum.style.opacity = p; chromeSection.style.opacity = p; } });
-    const p0 = parseFloat(progress.dataset.p || 0), p1 = (i + 1) / slides.length;
-    progress.dataset.p = p1;
-    tween({ group: 'chrome', dur: 900, ease: EASE.io, update: (p) => { progress.style.transform = `scaleX(${lerp(p0, p1, p)})`; } });
-
-    nextAt = t0 + (metas[i].duration ? metas[i].duration * 1000 : end + 2600);
-    if (MODE === 'live') try { history.replaceState(null, '', `${location.search}#${i + 1}`); } catch {}
-  }
-
-  function frame() {
-    const t = now();
-    runTweens(t);
-    for (const l of loops) l.f(t);
-    bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawBackground(bctx, cw, ch, pose, REDUCED ? 8 : t / 1000);
-    if (AUTOPLAY && t >= nextAt) {
-      if (cur < slides.length - 1) goTo(cur + 1);
-      else if (LOOP) goTo(0);
-      else { finished = true; nextAt = Infinity; }
+    let raf = 0, alive = true;
+    if (mode === 'live') {
+      const loop = () => { if (!alive) return; frame(); raf = requestAnimationFrame(loop); };
+      raf = requestAnimationFrame(loop);
     }
+    pose = poseFor(metas[o.start || 0] || {});
+    goTo(o.start || 0);
+    if (mode !== 'live') frame();
+
+    return {
+      goTo, next, prev,
+      get index() { return cur; },
+      get finished() { return finished; },
+      get count() { return slides.length; },
+      advance(ms) { vt += ms; frame(); return finished; },
+      destroy() {
+        alive = false;
+        cancelAnimationFrame(raf);
+        offs.forEach((f) => f());
+        ro ? ro.disconnect() : global.removeEventListener('resize', layout);
+      },
+    };
   }
 
-  // ——— Navigation ———
-  const next = () => goTo(cur + 1);
-  const prev = () => goTo(cur - 1);
-  if (MODE === 'live') {
-    window.addEventListener('keydown', (e) => {
-      if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); next(); }
-      else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); prev(); }
-      else if (e.key === 'Home') goTo(0);
-      else if (e.key === 'End') goTo(slides.length - 1);
-      else if (e.key === 'f' || e.key === 'F') {
-        const req = document.fullscreenElement ? document.exitFullscreen() : root.requestFullscreen?.();
-        req?.catch?.(() => {});
+  // Images de fond figées pour l'impression (PDF via ?print ou Imprimer du navigateur).
+  function addPrintBackgrounds(slides, metas) {
+    return Promise.all(slides.map((slide, i) => {
+      if (metas[i].theme === 'accent' || slide.querySelector(':scope > .print-bg')) return Promise.resolve();
+      const img = new Image();
+      img.className = 'print-bg';
+      img.alt = '';
+      img.src = backgroundURL(metas[i], i);
+      slide.prepend(img);
+      return img.decode().catch(() => {});
+    }));
+  }
+
+  // ——— Présentation autonome (fichier HTML construit) ———
+  function boot() {
+    const qs = new URLSearchParams(location.search);
+    const MODE = qs.has('print') ? 'print' : qs.has('capture') ? 'capture' : 'live';
+    const DATA = JSON.parse(document.getElementById('deck-data').textContent);
+    const root = document.documentElement;
+    root.classList.add('mode-' + MODE);
+    const slides = [...document.querySelectorAll('#stage .slide')];
+    const metas = DATA.slides;
+    if (qs.has('light')) {
+      slides.forEach((el, i) => {
+        if (metas[i].theme === 'dark') { metas[i].theme = 'light'; el.classList.replace('theme-dark', 'theme-light'); }
+      });
+    }
+
+    if (MODE === 'print') {
+      Promise.all([document.fonts.ready, addPrintBackgrounds(slides, metas)]).then(() => { global.__deckReady = true; });
+      return;
+    }
+
+    const start = MODE === 'live' ? clamp((parseInt(location.hash.slice(1), 10) || 1) - 1, 0, slides.length - 1) : 0;
+    document.fonts.ready.then(() => {
+      const player = createPlayer({
+        viewport: document.getElementById('viewport'),
+        stage: document.getElementById('stage'),
+        canvas: document.getElementById('bg'),
+        slides, metas, mode: MODE, start,
+        autoplay: (qs.has('autoplay') || MODE === 'capture') && !qs.has('noauto'),
+        loop: qs.has('loop'),
+        controls: true,
+        hash: MODE === 'live',
+      });
+      global.__deck = player;
+      global.__deckReady = true;
+      if (MODE === 'live') {
+        global.addEventListener('hashchange', () => player.goTo((parseInt(location.hash.slice(1), 10) || 1) - 1));
+        setTimeout(() => { const h = document.querySelector('.hint'); if (h) h.style.opacity = 0; }, 6000);
+        // Prépare les fonds d'impression en tâche de fond : Fichier > Imprimer donne alors un PDF vectoriel.
+        const prep = () => addPrintBackgrounds(slides, metas);
+        global.requestIdleCallback ? global.requestIdleCallback(prep, { timeout: 4000 }) : setTimeout(prep, 2500);
       }
     });
-    let tx = null, ty = null;
-    window.addEventListener('touchstart', (e) => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
-    window.addEventListener('touchend', (e) => {
-      if (tx === null) return;
-      const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
-      tx = null;
-      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) (dx < 0 ? next : prev)();
-      else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) (e.changedTouches[0].clientX > innerWidth * 0.3 ? next : prev)();
-    });
-    window.addEventListener('click', (e) => {
-      if (e.pointerType === 'touch' || e.target.closest('a')) return;
-      (e.clientX > innerWidth * 0.3 ? next : prev)();
-    });
-    window.addEventListener('hashchange', () => goTo((parseInt(location.hash.slice(1), 10) || 1) - 1));
   }
 
-  // ——— Démarrage ———
-  const startAt = MODE === 'live' ? (parseInt(location.hash.slice(1), 10) || 1) - 1 : 0;
-  document.fonts.ready.then(() => {
-    pose = poseFor(startAt);
-    goTo(startAt);
-    window.__deckReady = true;
-    if (MODE === 'live') {
-      const loop = () => { frame(); requestAnimationFrame(loop); };
-      requestAnimationFrame(loop);
-      setTimeout(() => { const h = document.querySelector('.hint'); if (h) h.style.opacity = 0; }, 6000);
-    } else {
-      frame();
-    }
-  });
-
-  // Interface pilotée par le script d'export vidéo.
-  window.__deck = {
-    advance(ms) { vt += ms; frame(); return finished; },
-    get finished() { return finished; },
-    get count() { return slides.length; },
-    goTo,
-  };
-})();
+  global.CoreshiftPlayer = { createPlayer, drawBackground, paintBackground, backgroundURL, poseFor, POSES };
+  if (document.getElementById('deck-data')) boot();
+})(window);

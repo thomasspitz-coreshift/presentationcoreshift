@@ -281,16 +281,32 @@ svg [data-a] { transform-box: fill-box; transform-origin: center; }
   .hint { display: none; }
 }
 
-.mode-live .slide > .chrome, .mode-capture .slide > .chrome { display: none; }
+.deck-live .slide > .chrome { display: none; }
 .mode-capture .hint, .mode-capture .rotate { display: none; }
-@media (hover: none) { .hint { display: none; } }
 
-/* ——— Mode PDF ——— */
+/* ——— Rendu figé (miniatures, éditeur du studio, export) ——— */
+.deck-static { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--ink); }
+.deck-static .slide { visibility: visible; }
+.deck-static .hub-pulse { display: none; }
+.bg-static { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* ——— Impression : ?print, ou Fichier > Imprimer depuis la présentation autonome ——— */
 @page { size: 1920px 1080px; margin: 0; }
+.print-bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; display: none; }
 .mode-print, .mode-print body { height: auto; overflow: visible; background: var(--ink); }
 .mode-print #bg, .mode-print .chrome-live, .mode-print .progress, .mode-print .hint, .mode-print .rotate, .mode-print .hub-pulse { display: none; }
 .mode-print #viewport { position: static; overflow: visible; }
-.mode-print #stage { position: static; transform: none; width: auto; height: auto; }
+.mode-print #stage { position: static; transform: none !important; width: auto; height: auto; }
 .mode-print .slide { position: relative; width: 1920px; height: 1080px; visibility: visible; break-after: page; page-break-after: always; }
-.print-bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+.mode-print .print-bg { display: block; }
+@media print {
+  html, body { height: auto !important; overflow: visible !important; background: var(--ink); }
+  #bg, .chrome-live, .progress, .hint, .rotate, .hub-pulse { display: none !important; }
+  #viewport { position: static !important; overflow: visible !important; }
+  #stage { position: static !important; transform: none !important; width: auto !important; height: auto !important; }
+  #stage .slide { position: relative !important; width: 1920px; height: 1080px; visibility: visible !important; opacity: 1 !important; transform: none !important; break-after: page; page-break-after: always; }
+  #stage .slide > .chrome { display: flex !important; }
+  #stage .slide [data-a], #stage .slide .wi { opacity: 1 !important; transform: none !important; filter: none !important; clip-path: none !important; stroke-dashoffset: 0 !important; }
+  .print-bg { display: block; }
+}
 .slide > .content { z-index: 1; }
